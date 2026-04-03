@@ -252,21 +252,24 @@ function leWi5CommaList(array $items): string
     return implode(', ', $items);
 }
 
-function leWi5FetchRecentDraws(\Joomla\Database\DatabaseDriver $db, string $dbCol, string $gameId, int $limit): array
+function leWi5FetchRecentDraws(\Joomla\Database\DatabaseDriver $db, string $dbCol, string $gameId, int $limit, bool $includeBonus = false): array
 {
+    $cols = [
+        $db->quoteName('id'),
+        $db->quoteName('draw_date'),
+        $db->quoteName('next_draw_date'),
+        $db->quoteName('next_jackpot'),
+        $db->quoteName('first'),
+        $db->quoteName('second'),
+        $db->quoteName('third'),
+        $db->quoteName('fourth'),
+        $db->quoteName('fifth'),
+    ];
+    if ($includeBonus) {
+        $cols[] = $db->quoteName('sixth');
+    }
     $query = $db->getQuery(true)
-        ->select([
-            $db->quoteName('id'),
-            $db->quoteName('draw_date'),
-            $db->quoteName('next_draw_date'),
-            $db->quoteName('next_jackpot'),
-            $db->quoteName('first'),
-            $db->quoteName('second'),
-            $db->quoteName('third'),
-            $db->quoteName('fourth'),
-            $db->quoteName('fifth'),
-            $db->quoteName('sixth'),
-        ])
+        ->select($cols)
         ->from($db->quoteName($dbCol))
         ->where($db->quoteName('game_id') . ' = ' . $db->quote($gameId))
         ->order($db->quoteName('draw_date') . ' DESC');
@@ -352,7 +355,7 @@ $leNodCurrent = max(10, min(700, $leNodCurrent));
  * Fetch latest draw
  * --------------------------------------------------------------------------
  */
-$leLatestRows   = leWi5FetchRecentDraws($db, $dbCol, $gId, 1);
+$leLatestRows   = leWi5FetchRecentDraws($db, $dbCol, $gId, 1, $leHasBonus);
 $leLr           = !empty($leLatestRows) ? $leLatestRows[0] : null;
 
 $leDrawDate     = $leLr ? (string) ($leLr['draw_date']      ?? '') : '';
@@ -371,7 +374,7 @@ $leLogo = ($stateAbrev !== '' && $gName !== '') ? leWi5ResolveLogo($stateAbrev, 
  * Analysis window data
  * --------------------------------------------------------------------------
  */
-$leRowsMain = leWi5FetchRecentDraws($db, $dbCol, $gId, $leNodCurrent);
+$leRowsMain = leWi5FetchRecentDraws($db, $dbCol, $gId, $leNodCurrent, $leHasBonus);
 
 list($leMainCounts, $leMainLastSeenIndex) = leWi5InitRange($leMainMin, $leMainMax);
 
@@ -435,8 +438,8 @@ $leRepeatedNumbers   = leWi5FindRepeatedFromLatest($leMainBallValues, array_slic
 $leMostActiveSummary = array_slice($leTopActiveKeys, 0, 3);
 $leQuietSummary      = array_slice($leQuietestKeys, 0, 3);
 
-$leWindow50  = leWi5FetchRecentDraws($db, $dbCol, $gId, 50);
-$leWindow300 = leWi5FetchRecentDraws($db, $dbCol, $gId, 300);
+$leWindow50  = leWi5FetchRecentDraws($db, $dbCol, $gId, 50,  $leHasBonus);
+$leWindow300 = leWi5FetchRecentDraws($db, $dbCol, $gId, 300, $leHasBonus);
 
 list($leCounts50,  ) = leWi5InitRange($leMainMin, $leMainMax);
 list($leCounts300, ) = leWi5InitRange($leMainMin, $leMainMax);
@@ -1487,7 +1490,9 @@ table.skai-table tbody tr:hover{
   }
 }
 
-@media (prefers-reduced-motion: reduce){
+.skai-note--inner{
+  margin:14px 16px 16px;
+}
   .skai-btn,
   .skai-button{
     transition:none;
@@ -1549,7 +1554,7 @@ table.skai-table tbody tr:hover{
             <?php if ($leHasMcmc) : ?>
               <a class="skai-mini-link" href="/picking-winning-numbers/artificial-intelligence/markov-chain-monte-carlo-mcmc-analysis?game_id=<?php echo rawurlencode($gId); ?>">MCMC Markov Analysis</a>
             <?php else : ?>
-              <a class="skai-mini-link" href="<?php echo htmlspecialchars($leArchRoute . '?gId=' . rawurlencode($gId) . '&stateName=' . rawurlencode($stateName) . '&gName=' . rawurlencode($gName) . '&sTn=' . rawurlencode(strtolower($stateAbrev)), ENT_QUOTES, 'UTF-8'); ?>">Lottery Archives</a>
+              <a class="skai-mini-link" href="<?php echo htmlspecialchars($leArchRoute, ENT_QUOTES, 'UTF-8'); ?>?gId=<?php echo rawurlencode($gId); ?>&amp;stateName=<?php echo rawurlencode($stateName); ?>&amp;gName=<?php echo rawurlencode($gName); ?>&amp;sTn=<?php echo rawurlencode(strtolower($stateAbrev)); ?>">Lottery Archives</a>
             <?php endif; ?>
             <a class="skai-mini-link" href="/lowest-drawn-number-analysis?gId=<?php echo rawurlencode($gId); ?>&amp;stateName=<?php echo rawurlencode($stateName); ?>&amp;gName=<?php echo rawurlencode($gName); ?>&amp;sTn=<?php echo rawurlencode(strtolower($stateAbrev)); ?>">Lowest Number Analysis</a>
           </div>
@@ -1903,7 +1908,7 @@ table.skai-table tbody tr:hover{
           </div>
         </div>
 
-        <div class="skai-note" style="margin:14px 16px 16px;">
+        <div class="skai-note skai-note--inner">
           Tracking is local to this page view. It is intended as a lightweight comparison aid while you move between the overview, tables, and advanced SKAI tools.
         </div>
       </div>
@@ -1957,7 +1962,7 @@ table.skai-table tbody tr:hover{
         <?php if ($leHasMcmc) : ?>
           <a class="skai-utility-link" href="/picking-winning-numbers/artificial-intelligence/markov-chain-monte-carlo-mcmc-analysis?game_id=<?php echo rawurlencode($gId); ?>">MCMC Markov Analysis</a>
         <?php endif; ?>
-        <a class="skai-utility-link" href="<?php echo htmlspecialchars($leArchRoute . '?gId=' . rawurlencode($gId) . '&stateName=' . rawurlencode($stateName) . '&gName=' . rawurlencode($gName) . '&sTn=' . rawurlencode(strtolower($stateAbrev)), ENT_QUOTES, 'UTF-8'); ?>">Lottery Archives</a>
+        <a class="skai-utility-link" href="<?php echo htmlspecialchars($leArchRoute, ENT_QUOTES, 'UTF-8'); ?>?gId=<?php echo rawurlencode($gId); ?>&amp;stateName=<?php echo rawurlencode($stateName); ?>&amp;gName=<?php echo rawurlencode($gName); ?>&amp;sTn=<?php echo rawurlencode(strtolower($stateAbrev)); ?>">Lottery Archives</a>
         <a class="skai-utility-link" href="/lowest-drawn-number-analysis?gId=<?php echo rawurlencode($gId); ?>&amp;stateName=<?php echo rawurlencode($stateName); ?>&amp;gName=<?php echo rawurlencode($gName); ?>&amp;sTn=<?php echo rawurlencode(strtolower($stateAbrev)); ?>">Lowest Number Analysis</a>
         <a class="skai-utility-link" href="/picking-winning-numbers/artificial-intelligence/skai-lottery-prediction?gameId=<?php echo rawurlencode($gId); ?>">SKAI Intelligence</a>
       </div>
